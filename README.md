@@ -1,5 +1,5 @@
 # Planning in AI
-This is a collection of source codes implementing a solution to homework tasks given in the course Planning in AI /KO/ at CTU. 
+This is a collection of source codes implementing a solution to homework tasks given in the course Planning in AI /PUI/ at CTU. 
 All code has been unless otherwise stated written by myself. Please, do not copy the solution.
 
 # Contents
