@@ -1,97 +1,99 @@
-from __future__ import absolute_import
 import sys
-# from abc import ABC, abstractmethod
+from abc import ABC, abstractmethod
 from collections import deque
-# from math import float('inf')
+from math import inf
 from pprint import pprint
-from Queue import Queue, PriorityQueue
-# from queue import PriorityQueue
+from queue import Queue, PriorityQueue
 from time import time, sleep
-# from typing import Dict, Iterable, Type, Tuple, Set, Generic, TypeVar, List, Union, Callable
+from typing import Dict, Iterable, Type, Tuple, Set, Generic, TypeVar, List, Union, Callable
 
 from problem import StripsOperator, Strips
 
 # Utilities
-# Item = TypeVar(u'Item')
+Item = TypeVar('Item')
 
 
-class CustomPriorityQueue():
+class CustomPriorityQueue(Generic[Item]):
     def __init__(self):
         self.queue = PriorityQueue()
 
-    def put(self, key, node):
+    def put(self, key: int, node: Item):
         self.queue.put((key, node))
 
-    def get(self):
+    def get(self) -> Item:
         _, item = self.queue.get()
         return item
 
-    def empty(self):
+    def empty(self) -> bool:
         return self.queue.empty()
 
 
-# class FastQueue():
-#     def __init__(self, max_key):
-#         self.items = 0
-#         self.lowest_nonempty = 0
-#         self.max_key = max_key
-#         self.queues = [deque() for _ in xrange(max_key + 1)]
-#
-#     def put(self, key, node):
-#         if key > self.max_key:
-#             raise Exception(u"key to big")
-#         self.queues[key].append(node)
-#         self.items += 1
-#
-#     def get(self):
-#         while self.lowest_nonempty <= self.max_key:
-#             queue = self.queues[self.lowest_nonempty]
-#             if len(queue) == 0:
-#                 self.lowest_nonempty += 1
-#             else:
-#                 return queue.pop()
-#         raise Exception(u"Queue empty")
-#
-#     def empty(self):
-#         return self.items == 0
+class FastQueue(Generic[Item]):
+    def __init__(self, max_key: int):
+        self.items = 0
+        self.lowest_nonempty = 0
+        self.max_key = max_key
+        self.queues = [deque() for _ in range(max_key + 1)]
+
+    def put(self, key: int, node: Item):
+        if key > self.max_key:
+            raise Exception("key to big")
+        if key < self.lowest_nonempty:
+            self.lowest_nonempty = key
+
+        self.queues[key].append(node)
+        self.items += 1
+
+    def get(self) -> Item:
+        while self.lowest_nonempty <= self.max_key:
+            queue = self.queues[self.lowest_nonempty]
+            if queue.count():
+                self.lowest_nonempty += 1
+            else:
+                print(self.lowest_nonempty)
+                return queue.pop()
+        raise Exception("Queue empty")
+
+    def empty(self) -> bool:
+        return self.items == 0
 
 
-# class IntegerPriorityQueue():
-#     def __init__(self):
-#         self.queues = {}
-#
-#     def get_queue(self, key):
-#         if key not in self.queues:
-#             self.queues[key] = Queue()
-#         return self.queues[key]
-#
-#     def put(self, key, node):
-#         self.get_queue(key).put(node)
-#
-#     def get(self):
-#         for key in sorted(self.queues):
-#             if not self.queues[key].empty():
-#                 return self.queues[key].get()
-#
-#     def empty(self):
-#         for _, Queue in self.queues.items():
-#             if not Queue.empty():
-#                 return False
-#         return True
-#
-#     def __contains__(self, item):
-#         for _, Queue in self.queues.items():
-#             if item in Queue:
-#                 return True
-#         return False
-#
+class HashPriorityQueue(Generic[Item]):
+    def __init__(self):
+        self.queues: Dict[int, Queue] = {}
+
+    def get_queue(self, key):
+        if key not in self.queues:
+            self.queues[key] = Queue()
+        return self.queues[key]
+
+    def put(self, key: int, node: Item):
+        self.get_queue(key).put(node)
+
+    def get(self) -> Item:
+        for key in sorted(self.queues):
+            if not self.queues[key].empty():
+                return self.queues[key].get()
+
+    def empty(self) -> bool:
+        for _, queue in self.queues.items():
+            if not queue.empty():
+                return False
+        return True
+
+    def __contains__(self, item: Item):
+        for _, queue in self.queues.items():
+            if item in queue:
+                return True
+        return False
+
 
 # Problem and State definition
-# Fact = TypeVar(u"Fact", bound=int)
+Fact = TypeVar("Fact", bound=int)
 
 
-class State(object):
-    def __init__(self, facts, g=float('inf'), h=float('inf')):
+class State:
+    def __init__(self, facts: Set[Fact], g=inf, h=inf):
         self.facts = facts
         self.g = g
         self.h = h
@@ -100,12 +102,12 @@ class State(object):
 
         self._fact_hash = hash(sum(i for i in self.facts))
 
-    def set_previous(self, state, operator):
+    def set_previous(self, state: "State", operator: StripsOperator):
         self.previous_operator = operator
         self.previous_state = state
         self.g = state.g + operator.cost
 
-    def __contains__(self, state):
+    def __contains__(self, state: "State"):
         return state.facts.issubset(self.facts)
 
     def __eq__(self, other):
@@ -115,40 +117,40 @@ class State(object):
         return self._fact_hash
 
     def __str__(self):
-        return u"<State> g: %0.2f, h: %0.2f facts: %s" % (self.g, self.h, unicode(self.facts))
+        return "<State> g: %0.2f, h: %0.2f facts: %s" % (self.g, self.h, str(self.facts))
 
     @property
     def f(self):
         if self.h is None:
-            raise ValueError(u"%s: h is None" % unicode(self))
+            raise ValueError("%s: h is None" % str(self))
         return self.g + self.h
 
     def __lt__(self, other):
         return self.h < other.h
 
 
-class OperatorBag(object):
-    def __init__(self, facts, operators):
-        self._by_pre = [[] for _ in xrange(len(facts))]
+class OperatorBag:
+    def __init__(self, facts: Set[Fact], operators: Iterable[StripsOperator]):
+        self._by_pre = [[] for _ in range(len(facts))]
         for operator in operators:
             for fact in operator.pre:
                 self._by_pre[fact].append(operator)
 
-        self._by_add = [[] for _ in xrange(len(facts))]
+        self._by_add = [[] for _ in range(len(facts))]
         for operator in operators:
             for fact in operator.add_eff:
                 self._by_add[fact].append(operator)
 
-    def get_by_pre(self, fact):
+    def get_by_pre(self, fact: Fact) -> Iterable[StripsOperator]:
         return self._by_pre[fact]
 
-    def get_by_add(self, fact):
+    def get_by_add(self, fact: Fact) -> Iterable[StripsOperator]:
         return self._by_add[fact]
 
 
-class Problem(object):
-    def __init__(self, facts, operators, goal_facts,
-                 init_facts):
+class Problem:
+    def __init__(self, facts: Set[Fact], operators: Iterable[StripsOperator], goal_facts: Set[Fact],
+                 init_facts: Set[Fact]):
         self._init = frozenset(init_facts)
         self._goal = frozenset(goal_facts)
         self.operators = tuple(operators)
@@ -156,45 +158,45 @@ class Problem(object):
         self.operator_bag = OperatorBag(facts, operators)
 
     @classmethod
-    def from_strips(cls, strips):
-        facts = set(xrange(len(strips.facts)))
+    def from_strips(cls, strips: Strips):
+        facts = set(range(len(strips.facts)))
         operators = strips.operators
         goal_facts = strips.goal
         init_facts = strips.init
         return cls(facts, operators, goal_facts, init_facts)
 
     @property
-    def start_state(self):
+    def start_state(self) -> State:
         return State(set(self._init), g=0)
 
     @property
-    def goal_state(self):
+    def goal_state(self) -> State:
         return State(set(self._goal), h=0)
 
     def __str__(self):
-        return u"Facts: " + unicode(self.facts) + u"\n" + \
-               u"Init facts: " + unicode(self._init) + u"\n" + \
-               u"Goal facts: " + unicode(self._goal)
+        return "Facts: " + str(self.facts) + "\n" + \
+               "Init facts: " + str(self._init) + "\n" + \
+               "Goal facts: " + str(self._goal)
 
 
 class IGProblem(Problem):
-    def __init__(self, facts, operators, goal_facts,
-                 init_facts, goal_fact, init_fact):
-        super(IGProblem, self).__init__(facts, operators, goal_facts, init_facts)
+    def __init__(self, facts: Set[Fact], operators: Iterable[StripsOperator], goal_facts: Set[Fact],
+                 init_facts: Set[Fact], goal_fact: Fact, init_fact: Fact):
+        super().__init__(facts, operators, goal_facts, init_facts)
         self.goal_fact = goal_fact
         self.init_fact = init_fact
 
 
 # Plan
 
-class Plan(object):
-    def __init__(self, start_state, final_state):
+class Plan:
+    def __init__(self, start_state: State, final_state: State):
         self.start_state = start_state
         self.final_state = final_state
         self.plan = self._extract_solution(start_state, final_state)
 
     @staticmethod
-    def _extract_solution(start_state, final_state):
+    def _extract_solution(start_state: State, final_state: State) -> List[Union[StripsOperator, State]]:
         path = [final_state]
 
         state = final_state
@@ -211,38 +213,38 @@ class Plan(object):
         return self.final_state.g
 
     def __str__(self):
-        s = u""
+        s = ""
         for obj in self.plan:
             if isinstance(obj, State):
-                s += unicode(obj)
+                s += str(obj)
             elif isinstance(obj, StripsOperator):
-                s += u" -> " + unicode(obj.name) + u"\n"
+                s += " -> " + str(obj.name) + "\n"
         return s
 
-    def to_plan_file(self):
+    def to_plan_file(self) -> str:
         operators = []
         for obj in self.plan:
             if isinstance(obj, StripsOperator):
                 operators.append(obj.name)
-        return u"\n".join(operators)
+        return "\n".join(operators)
 
 
 class PlanNotFound(Plan):
-    def __init(self, start_state, final_state):
+    def __init(self, start_state: State, final_state: State):
         pass
 
     def __str__(self):
-        return u"Plan not found."
+        return "Plan not found."
 
 
 # Problem specific classes
 
-class StateExpander(object):
+class StateExpander:
     # todo: if needed, build better representation of operator bag
-    def __init__(self, problem):
+    def __init__(self, problem: Problem):
         self.operators = self._init_operator_tree(problem.operators)
 
-    def expand(self, state):
+    def expand(self, state: State) -> Iterable[Tuple[StripsOperator, State]]:
         states = []
         for operator in self.operators:
             if operator.pre.issubset(state.facts):
@@ -251,20 +253,21 @@ class StateExpander(object):
         return states
 
     @staticmethod
-    def _init_operator_tree(operators):
+    def _init_operator_tree(operators: Iterable[StripsOperator]):
         return operators
 
 
-class Heuristic():
-    def __init__(self, problem):
+class Heuristic(ABC):
+    def __init__(self, problem: Problem):
         self.problem = problem
 
-    def estimate(self, state, goal_state):
+    @abstractmethod
+    def estimate(self, state: State, goal_state: State) -> float:
         pass
 
 
 class Hmax(Heuristic):
-    def estimate(self, state, goal_state):
+    def estimate(self, state: State, goal_state: State) -> Union[float, Tuple[float, Dict[str, Fact]]]:
         delta = self.initialize_estimate(state)
 
         remaining_facts = set(self.problem.facts)
@@ -273,7 +276,7 @@ class Hmax(Heuristic):
             _, c = self.optimize_delta(remaining_facts, delta)
 
             remaining_facts.remove(c)
-            not_visited_goal_facts -= set([c])
+            not_visited_goal_facts -= {c}
 
             for operator in self.problem.operator_bag.get_by_pre(c):
                 operator.U -= 1
@@ -287,7 +290,7 @@ class Hmax(Heuristic):
 
     @staticmethod
     def optimize_delta(facts, delta, minimization=True):
-        opt_val = float('inf') if minimization else -float('inf')
+        opt_val = inf if minimization else -inf
         opt_arg = None
         for f in facts:
             if (minimization and delta[f] <= opt_val) or (not minimization and delta[f] >= opt_val):
@@ -296,8 +299,8 @@ class Hmax(Heuristic):
 
         return opt_val, opt_arg
 
-    def initialize_estimate(self, state):
-        delta = [float('inf')] * len(self.problem.facts)
+    def initialize_estimate(self, state: State):
+        delta = [inf] * len(self.problem.facts)
         for fact in state.facts:
             delta[fact] = 0
 
@@ -308,59 +311,52 @@ class Hmax(Heuristic):
 
 
 class HmaxLm(Hmax):
-    def estimate(self, state, goal_state):
+    def estimate(self, state: State, goal_state: State) -> Tuple[float, Dict[str, Fact]]:
         delta = self.initialize_estimate(state)
         supporter = dict()
 
         remaining_facts = set(self.problem.facts)
-        # visited_goal_fact = False
         while len(remaining_facts) > 0:
-            _, c = self.optimize_delta(remaining_facts, delta)
+            _, f = self.optimize_delta(remaining_facts, delta)
+            remaining_facts.remove(f)
 
-            remaining_facts.remove(c)
-            # visited_goal_fact = self.problem.goal_fact == c
-
-            for operator in self.problem.operator_bag.get_by_pre(c):
+            for operator in self.problem.operator_bag.get_by_pre(f):
                 operator.U -= 1
                 if operator.U == 0:
-                    supporter[operator.name] = c
+                    supporter[operator.name] = f
+
                     for fact in operator.add_eff:
-                        if operator.cost + delta[c] < delta[fact]:
-                            delta[fact] = operator.cost + delta[c]
+                        if operator.cost + delta[f] < delta[fact]:
+                            delta[fact] = operator.cost + delta[f]
 
         h_max = delta[self.problem.goal_fact]
-        # print("hmax: %s" % str(h_max))
         return h_max, supporter
 
 
 class LmCut(Heuristic):
-    def estimate(self, state, goal_state):
-        # print("--- LmCut for state: %s" % str(state))
-
+    def estimate(self, state: State, goal_state: State) -> float:
         lm_cut_value = 0
         problem = self._construct_problem(state, goal_state)
         h_max = HmaxLm(problem)
 
         h, supporter = h_max.estimate(problem.start_state, problem.goal_state)
         while h != 0:
-            if h == float('inf'):
-                # print("lm = float('inf')")
-                return float('inf')
+            if h == inf:
+                return inf
 
             landmarks = self._get_landmarks(problem, supporter)
             min_landmark_cost = min(landmark.cost for landmark in landmarks)
             lm_cut_value += min_landmark_cost
 
-            for landmark in landmarks:
-                landmark.cost -= min_landmark_cost
+            for operator in landmarks:
+                operator.cost -= min_landmark_cost
 
             h, supporter = h_max.estimate(problem.start_state, problem.goal_state)
 
-        # print("lm-cut: %d" % lm_cut_value)
         return lm_cut_value
 
     @staticmethod
-    def _get_landmarks(problem, supporter):
+    def _get_landmarks(problem: IGProblem, supporter) -> Set[StripsOperator]:
         # backward BFS walk
         landmark_candidates = set()
         queue = deque()
@@ -368,26 +364,22 @@ class LmCut(Heuristic):
         visited_facts = set()
 
         while len(queue) > 0:
-            fact = queue.pop()
+            fact: Fact = queue.pop()
             visited_facts.add(fact)
 
             for operator in problem.operator_bag.get_by_add(fact):
-                # if operator.name not in supporter:
-                #     continue
-
                 if operator.cost == 0 and supporter[operator.name] not in visited_facts:
                     queue.append(supporter[operator.name])
                 elif operator.cost > 0:
                     landmark_candidates.add(operator.name)
 
-        # forward BFS walk
         landmarks = set()
         queue = deque()
         queue.append(problem.init_fact)
         visited_facts = set()
 
         while len(queue) > 0:
-            fact = queue.pop()
+            fact: Fact = queue.pop()
             visited_facts.add(fact)
 
             for operator in problem.operator_bag.get_by_pre(fact):
@@ -402,57 +394,57 @@ class LmCut(Heuristic):
 
         return landmarks
 
-    def _construct_problem(self, state, goal_state):
+    def _construct_problem(self, state: State, goal_state: State):
         init_fact = len(self.problem.facts)
         goal_fact = init_fact + 1
-        facts = self.problem.facts | set([init_fact, goal_fact])
+        facts = self.problem.facts | {init_fact, goal_fact}
 
-        init_o = StripsOperator(u"init_operator", [init_fact], state.facts, [], 0)
-        goal_o = StripsOperator(u"goal_operator", goal_state.facts, [goal_fact], [], 0)
+        init_o = StripsOperator("init_operator", [init_fact], state.facts, [], 0)
+        goal_o = StripsOperator("goal_operator", goal_state.facts, [goal_fact], [], 0)
 
         new_operators = []
         for operator in self.problem.operators:
-            new_operator = StripsOperator(u"", operator.pre, operator.add_eff, operator.del_eff,
+            new_operator = StripsOperator("", operator.pre, operator.add_eff, operator.del_eff,
                                           operator.cost)
             new_operator.name = operator.name  # dirty trick
             new_operators.append(new_operator)
         new_operators += [init_o, goal_o]
 
-        goal_facts = set([goal_fact])
-        init_facts = set([init_fact])
+        goal_facts = {goal_fact}
+        init_facts = {init_fact}
         return IGProblem(facts, new_operators, goal_facts, init_facts, goal_fact, init_fact)
 
 
 class LmCutCashed(LmCut):
-    def estimate(self, state, goal_state):
+    def estimate(self, state: State, goal_state: State) -> float:
         if state not in self.cached_h:
-            lm_cut_value = LmCut.estimate(self, state, goal_state)
+            lm_cut_value = super().estimate(state, goal_state)
             self.cached_h[state] = lm_cut_value
         return self.cached_h[state]
 
-    def __init__(self, problem):
-        LmCut.__init__(self, problem)
+    def __init__(self, problem: Problem):
+        super().__init__(problem)
         self.cached_h = {}
 
 
 class UnfulfilledFacts(Heuristic):
-    def estimate(self, state, goal_state):
+    def estimate(self, state: State, goal_state: State) -> float:
         return len(goal_state.facts - state.facts)
 
 
 class DummyHeuristic(Heuristic):
-    def estimate(self, state, goal_state):
+    def estimate(self, state: State, goal_state: State) -> float:
         return 1.0
 
 
 # A* implementation
 
-class Solver(object):
+class Solver:
     def __init__(self,
                  priority_queue,
-                 state_expander,
-                 heuristics,
-                 problem_representation):
+                 state_expander: StateExpander,
+                 heuristics: Heuristic,
+                 problem_representation: Problem):
         self.problem_representation = problem_representation
         self.heuristics = heuristics
         self.state_expander = state_expander
@@ -466,7 +458,7 @@ class Solver(object):
         self.num_added_to_queue_states = 0
 
     @property
-    def plan(self):
+    def plan(self) -> Plan:
         if self._plan is None:
             self._plan = self._compute_plan()
         return self._plan
@@ -499,21 +491,21 @@ class Solver(object):
                 return Plan(start_state, current_state)
 
             for operator, neighbour in self.state_expander.expand(current_state):
-                neighbour.h = self.heuristics.estimate(neighbour, goal_state)
                 neighbour.set_previous(current_state, operator)
+                neighbour.h = self.heuristics.estimate(neighbour, goal_state)
 
-                if neighbour.h < float('inf') and neighbour not in closed_states:
+                if neighbour.h < inf and neighbour not in closed_states:
                     self.num_added_to_queue_states += 1
                     self.open_states.put(neighbour.f, neighbour)
                     # else:
-                    #     raise Exception("h = float('inf')")
+                    #     raise Exception("h = inf")
 
         return PlanNotFound(start_state, goal_state)
 
 
 # Time
 
-class Timer(object):
+class Timer:
     def __init__(self, name):
         self.name = name
         self.time_start = time()
@@ -523,7 +515,7 @@ class Timer(object):
         last_idx = len(self._checkpoints) - 1
         name, time = self._checkpoints[last_idx]
         _, previous_time = self._checkpoints[last_idx - 1]
-        print u"<Timer> %s: %0.5f s" % (name, time - previous_time)
+        print("<Timer> %s: %0.5f s" % (name, time - previous_time))
 
     def checkpoint(self, name, verbose=True):
         self._checkpoints.append((name, time()))
@@ -531,53 +523,53 @@ class Timer(object):
             self._print_last()
 
     def finish(self):
-        print u"<Timer> %s: %0.2f s" % (u"Finish", time() - self.time_start)
+        print("<Timer> %s: %0.2f s" % ("Finish", time() - self.time_start))
 
 
 # Check Utils
 
-def correctness_check(problem_representation, plan):
+def correctness_check(problem_representation: Problem, plan: Plan):
     if isinstance(plan, PlanNotFound):
         return False
     return problem_representation.goal_state.facts.issubset(plan.final_state.facts)
 
 
-def efficiency_check(plan_builder):
-    return u"Popped from queue states: " + unicode(plan_builder.num_opened_states) + u"\n" + \
-           u"Added to queue: " + unicode(plan_builder.num_added_to_queue_states) + u"\n"
+def efficiency_check(plan_builder: Solver):
+    return "Popped from queue states: " + str(plan_builder.num_opened_states) + "\n" + \
+           "Added to queue: " + str(plan_builder.num_added_to_queue_states) + "\n"
 
 
 def main(fn_strips):
     strips = Strips(fn_strips)
 
-    # timer = Timer("Start")
+    timer = Timer("Start")
 
     problem_representation = Problem.from_strips(strips)
     heuristics = LmCutCashed(problem_representation)
     state_expander = StateExpander(problem_representation)
 
-    # timer.checkpoint("Operator Tree built")
+    timer.checkpoint("Operator Tree built")
 
-    plan_builder = Solver(CustomPriorityQueue(), state_expander, heuristics, problem_representation)
+    plan_builder = Solver(FastQueue(1000), state_expander, heuristics, problem_representation)
     plan = plan_builder.plan
 
-    # timer.checkpoint("Plan built")
+    timer.checkpoint("Plan built")
 
-    print u";; Cost: %d" % plan.cost
-    print u";; Init: %d" % plan_builder.init_state_h
-    print
-    print plan.to_plan_file()
+    print(";; Cost: %d" % plan.cost)
+    print(";; Init: %d" % plan_builder.init_state_h)
+    print()
+    print(plan.to_plan_file())
 
-    # print()
-    # print("Correctness of the plan: " + str(correctness_check(problem_representation, plan)))
-    # print(efficiency_check(plan_builder))
+    print()
+    print("Correctness of the plan: " + str(correctness_check(problem_representation, plan)))
+    print(efficiency_check(plan_builder))
     #
-    # timer.finish()
+    timer.finish()
 
 
-if __name__ == u'__main__':
+if __name__ == '__main__':
     if len(sys.argv) != 3:
-        print u'Usage: {0} problem.strips problem.fdr'.format(sys.argv[0])
+        print('Usage: {0} problem.strips problem.fdr'.format(sys.argv[0]))
         sys.exit(-1)
 
     main(sys.argv[1])
